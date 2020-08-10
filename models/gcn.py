@@ -5,14 +5,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
+import os
 
-from utils import *
+from .utils import *
 
 class GraphConvolution(nn.Module):
     """
     	Source: "https://github.com/Megvii-Nanjing/ML-GCN/blob/master/models.py"
     """
-    def __init__(self, in_features, out_features, bias=False):
+    def __init__(self, in_features, out_features, num_classes=80, bias=False):
         super(GraphConvolution, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
@@ -22,6 +23,8 @@ class GraphConvolution(nn.Module):
         else:
             self.register_parameter('bias', None)
         self.reset_parameters()
+        self.adj = gen_A(num_classes, 0, os.path.join(os.path.dirname(__file__) , 'coco_adj.pkl'))
+        self.adj = nn.Parameter(torch.from_numpy(self.adj).float())
 
     def reset_parameters(self):
         stdv = 1. / math.sqrt(self.weight.size(1))
@@ -29,9 +32,10 @@ class GraphConvolution(nn.Module):
         if self.bias is not None:
             self.bias.data.uniform_(-stdv, stdv)
 
-    def forward(self, input, adj):
+    def forward(self, input):
         support = torch.matmul(input, self.weight)
-        output = torch.matmul(adj, support)
+        #print(self.adj.size(), support.size())
+        output = torch.matmul(self.adj, support)
         if self.bias is not None:
             return output + self.bias
         else:
@@ -78,7 +82,7 @@ class KSSNet(nn.Module):
         self.res_block3 = self.backbone.layer3
         self.res_block4 = self.backbone.layer4
 
-        self.gcn1 = GraphConvolution(256, 256)
+        self.gcn1 = GraphConvolution(300, 256)
         self.gcn2 = GraphConvolution(256, 512)
         self.gcn3 = GraphConvolution(512, 1024)
         self.gcn4 = GraphConvolution(1024, 2048)
@@ -90,35 +94,34 @@ class KSSNet(nn.Module):
 
         self.gap = nn.AdaptiveAvgPool2d(1)
 
-        self.up_layer = nn.Conv2d(2048, 80, 1, 1)
+        #self.up_layer = nn.Conv2d(2048, 80, 1, 1)
+        self.fc = nn.Linear(2048, 80)
 
     def forward(self, x, word_embedding):
+        word_embedding = word_embedding[0]
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)
 
-        adj = torch.rand((80,80))
         x = self.res_block1(x)
-        e = self.gcn1(word_embedding, adj)
-        import pdb
-        #pdb.set_trace()
+        e = self.gcn1(word_embedding)
         x = self.lc1(x, e)
         e = F.leaky_relu(e, 0.2)
 
 
         x = self.res_block2(x)
-        e = self.gcn2(e, adj)
+        e = self.gcn2(e)
         x = self.lc2(x, e)
         e = F.leaky_relu(e, 0.2)
 
         x = self.res_block3(x)
-        e = self.gcn3(e, adj)
+        e = self.gcn3(e)
         x = self.lc3(x, e)
         e = F.leaky_relu(e, 0.2)
 
         x = self.res_block4(x)
-        e = self.gcn4(e, adj)
+        e = self.gcn4(e)
         x = self.lc4(x, e)
         e = torch.sigmoid(e)
 
@@ -126,11 +129,23 @@ class KSSNet(nn.Module):
         x = feat.view(feat.size(0), -1)
         # e = [feat, label_number]
         e = e.transpose(0,1)
-        x = torch.matmul(x, e)
-        y = self.up_layer(feat)
-        y = y.view(y.size(0), -1)
-        x = x + y
-        return x
+        #print(e)
+        #print(e)
+        #print(x)
+        #print(x.size(), e.size())
+        #x = torch.matmul(x, e)
+        y = self.fc(x)
+        #y = self.up_layer(feat)
+        #print(y)
+        #y = y.view(y.size(0), -1)
+        y = torch.sigmoid(y)
+        #print(y)
+        #print(y)
+        #print(x)
+        #x = x + y
+        #print(x)
+        #x = torch.sigmoid(x)
+        return y
 
 if __name__ == "__main__":
     kssnet = KSSNet()

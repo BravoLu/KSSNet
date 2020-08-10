@@ -1,5 +1,8 @@
 import torch.nn as nn
 import torch
+from .gcn import KSSNet
+
+__all__ = ['KSSNet']
 
 '''
 def weights_init(m):
