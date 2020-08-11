@@ -6,6 +6,7 @@ import torch
 from tqdm import tqdm
 import os
 from models import *
+from transforms import *
 
 def train():
     pass
@@ -59,7 +60,8 @@ def test(model, test_loader):
     for idx, ((imgs, img_names, word_embedding),labels) in tqdm(enumerate(test_loader)):
         imgs, labels = imgs.cuda(), labels.cuda()
         with torch.no_grad():
-            predict = model(imgs, word_embedding)
+            #predict = model(imgs, word_embedding)
+            predict = model(imgs)
         #print(predict)
         #print(labels)
         targets.append(labels)
@@ -79,13 +81,13 @@ std = [0.229, 0.224, 0.225]
 if __name__ == "__main__":
     os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
     train_transform = transforms.Compose([
-        transforms.Resize((448, 448)),
+        MultiScaleCrop(448, scales=(1.0, 0.875, 0.75, 0.66, 0.5), max_distort=2),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize(mean=mean, std=std),
     ])
     test_transform = transforms.Compose([
-        transforms.Resize((448, 448)),
+        Warp(448),
         transforms.ToTensor(),
         transforms.Normalize(mean=mean, std=std),
     ])
@@ -105,15 +107,15 @@ if __name__ == "__main__":
     )
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    model = KSSNet().to(device)
-    #model = resnet101(pretrained=False, num_classes=80).to(device)
+    #model = KSSNet().to(device)
+    model = resnet101(pretrained=False, num_classes=80).to(device)
     #model.load_state_dict(torch.load('tmp.pth').state_dict())
     model = nn.DataParallel(model)
     #mAP = test(model, test_loader)
     #print('mAP: {:.2f}'.format(mAP))
 
-    criterion = nn.BCELoss().to(device)
-    #criterion = nn.MultiLabelSoftMarginLoss()
+    #criterion = nn.BCELoss().to(device)
+    criterion = nn.MultiLabelSoftMarginLoss()
     optimizer = torch.optim.SGD(model.parameters(),
                                 lr=0.1,
                                 momentum=0.9,
@@ -123,7 +125,8 @@ if __name__ == "__main__":
             imgs, targets = imgs.to(device), targets.to(device)
             #import pdb
             #pdb.set_trace()
-            predicts = model(imgs, word_embedding)
+            #predicts = model(imgs, word_embedding)
+            predicts = model(imgs)
             #print(predicts)
             loss = criterion(predicts, targets)
             #print('Epoch: {} | loss: {:.2f} |'.format(epoch+1, loss.item()))
@@ -135,7 +138,7 @@ if __name__ == "__main__":
             torch.save(model.module, 'tmp.pth')
         else:
             torch.save(model, 'tmp.pth')
-        if epoch % 5 == 0:
+        if epoch % 1 == 0:
             mAP = test(model, test_loader)
             print("Epoch: {} | mAP: {}".format(epoch, mAP))
 
