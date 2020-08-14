@@ -94,7 +94,6 @@ class KSSNet(nn.Module):
 
         self.gap = nn.AdaptiveAvgPool2d(1)
 
-        #self.up_layer = nn.Conv2d(2048, 80, 1, 1)
         self.fc = nn.Linear(2048, 80)
 
     def forward(self, x, word_embedding):
@@ -108,7 +107,6 @@ class KSSNet(nn.Module):
         e = self.gcn1(word_embedding)
         x = self.lc1(x, e)
         e = F.leaky_relu(e, 0.2)
-
 
         x = self.res_block2(x)
         e = self.gcn2(e)
@@ -127,24 +125,9 @@ class KSSNet(nn.Module):
 
         feat = self.gap(x)
         x = feat.view(feat.size(0), -1)
-        # e = [feat, label_number]
         e = e.transpose(0,1)
-        #print(e)
-        #print(e)
-        #print(x)
-        #print(x.size(), e.size())
-        #x = torch.matmul(x, e)
         y = self.fc(x)
-        #y = self.up_layer(feat)
-        #print(y)
-        #y = y.view(y.size(0), -1)
         y = torch.sigmoid(y)
-        #print(y)
-        #print(y)
-        #print(x)
-        #x = x + y
-        #print(x)
-        #x = torch.sigmoid(x)
         return y
 
 if __name__ == "__main__":

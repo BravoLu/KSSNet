@@ -81,13 +81,15 @@ std = [0.229, 0.224, 0.225]
 if __name__ == "__main__":
     os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
     train_transform = transforms.Compose([
-        MultiScaleCrop(448, scales=(1.0, 0.875, 0.75, 0.66, 0.5), max_distort=2),
+        #MultiScaleCrop(448, scales=(1.0, 0.875, 0.75, 0.66, 0.5), max_distort=2),
+        transforms.Resize((448, 448)),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize(mean=mean, std=std),
     ])
     test_transform = transforms.Compose([
-        Warp(448),
+        #Warp(448),
+        transforms.Resize((448, 448)),
         transforms.ToTensor(),
         transforms.Normalize(mean=mean, std=std),
     ])
@@ -114,8 +116,8 @@ if __name__ == "__main__":
     #mAP = test(model, test_loader)
     #print('mAP: {:.2f}'.format(mAP))
 
-    #criterion = nn.BCELoss().to(device)
-    criterion = nn.MultiLabelSoftMarginLoss()
+    criterion = nn.BCELoss().to(device)
+    #criterion = nn.MultiLabelSoftMarginLoss()
     optimizer = torch.optim.SGD(model.parameters(),
                                 lr=0.1,
                                 momentum=0.9,
@@ -141,9 +143,3 @@ if __name__ == "__main__":
         if epoch % 1 == 0:
             mAP = test(model, test_loader)
             print("Epoch: {} | mAP: {}".format(epoch, mAP))
-
-
-
-
-
-
