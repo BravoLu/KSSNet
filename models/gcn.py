@@ -82,7 +82,7 @@ class KSSNet(nn.Module):
         self.res_block3 = self.backbone.layer3
         self.res_block4 = self.backbone.layer4
 
-        self.gcn1 = GraphConvolution(300, 256)
+        self.gcn1 = GraphConvolution(768, 256)
         self.gcn2 = GraphConvolution(256, 512)
         self.gcn3 = GraphConvolution(512, 1024)
         self.gcn4 = GraphConvolution(1024, 2048)
