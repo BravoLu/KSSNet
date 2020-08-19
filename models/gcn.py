@@ -121,7 +121,7 @@ class KSSNet(nn.Module):
         x = self.res_block4(x)
         e = self.gcn4(e)
         x = self.lc4(x, e)
-        e = torch.sigmoid(e)
+        #e = torch.sigmoid(e)
 
         feat = self.gap(x)
         x = feat.view(feat.size(0), -1)

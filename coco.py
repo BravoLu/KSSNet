@@ -108,7 +108,7 @@ class COCO2014(data.Dataset):
         self.get_anno()
         self.num_classes = len(self.cat2idx)
 
-        with open(os.path.join(os.path.dirname(__file__), 'data', 'coco_glove_word2vec.pkl'), 'rb') as f:
+        with open(os.path.join(os.path.dirname(__file__), 'data', 'bert_coco.pkl'), 'rb') as f:
             import pickle
             self.word_embedding = pickle.load(f)
 
