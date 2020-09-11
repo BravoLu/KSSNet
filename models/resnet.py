@@ -208,8 +208,15 @@ def resnet101(pretrained=False, **kwargs):
         pretrained (bool): If True, returns a model pre-trained on ImageNet
     """
     model = ResNet(Bottleneck, [3, 4, 23, 3], **kwargs)
-    if pretrained:
-        model.load_state_dict(model_zoo.load_url(model_urls['resnet101']), strict=False)
+    params = torch.load('/raid/home/bravolu/.cache/torch/checkpoints/resnet101-5d3b4d8f.pth')
+    for param in params:
+        if 'fc' in param: continue
+        if param not in model.state_dict().keys(): continue
+        if params[param].shape != model.state_dict()[param].shape: continue
+        model.state_dict()[param].copy_(params[param])
+
+    #if pretrained:
+    #    model.load_state_dict(model_zoo.load_url(model_urls['resnet101']))
     return model
 
 
