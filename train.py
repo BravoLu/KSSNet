@@ -6,12 +6,44 @@ import torch.nn as nn
 import torch
 from tqdm import tqdm
 import os
+import argparse
+
 from models import *
 from transforms import *
 
-ckpt_dir = 'ckpts'
-def train():
-    pass
+def train(args, model, train_loader, test_loader):
+    criterion = nn.BCELoss().to(device)
+    #criterion = nn.MultiLabelSoftMarginLoss()
+    #optimizer = torch.optim.SGD(model.parameters(),
+    #                            lr=0.1,
+    #                            momentum=0.9,
+    #                            weight_decay=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 40], gamma=0.1)
+    for epoch in range(20):
+        for idx, ((imgs, img_names, word_embedding), targets) in tqdm(enumerate(train_loader)):
+            imgs, targets = imgs.to(device), targets.to(device)
+            #import pdb
+            #pdb.set_trace()
+            #predicts = model(imgs, word_embedding)
+            predicts = model(imgs)
+            #print(predicts)
+            loss = criterion(predicts, targets)
+            #print('Epoch: {} | loss: {:.2f} |'.format(epoch+1, loss.item()))
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        scheduler.step()
+        if isinstance(model, nn.DataParallel):
+            if not os.path.exists(os.path.dirname(args.ckpt)):
+                os.makedirs(os.path.dirname(args.ckpt))
+            torch.save(model.module, args.ckpt)
+        else:
+            torch.save(model, args.ckpt)
+        if epoch % args.eval_freq == 0:
+            mAP = test(model, test_loader)
+            print("Epoch: {} | mAP: {}".format(epoch, mAP))
 
 def mean_ap(scores, targets):
     if scores.numel() == 0:
@@ -81,7 +113,16 @@ mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
 
 if __name__ == "__main__":
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
+    parser = argparse.ArgumentParser('Multi-Label-Classification Task')
+    parser.add_argument('--data', type=str, default='')
+    parser.add_argument('--test', action='store_true')
+    parser.add_argument('--eval_freq', type=int, default=1, help='the frequency of evaluations' )
+    parser.add_argument('--gpu', type=str, default='0,1,2,3')
+    parser.add_argument('--ckpt', type=str, default='')
+    args = parser.parse_args()
+
+
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     train_transform = transforms.Compose([
         #MultiScaleCrop(448, scales=(1.0, 0.875, 0.75, 0.66, 0.5), max_distort=2),
         transforms.Resize((448, 448)),
@@ -95,8 +136,8 @@ if __name__ == "__main__":
         transforms.ToTensor(),
         transforms.Normalize(mean=mean, std=std),
     ])
-    train_set = COCO2014(root='/raid/home/bravolu/data/coco/', phase='train', transform=train_transform)
-    test_set = COCO2014(root='/raid/home/bravolu/data/coco/', phase='val', transform=test_transform)
+    train_set = COCO2014(root=args.data, phase='train', transform=train_transform)
+    test_set = COCO2014(root=args.data, phase='val', transform=test_transform)
     train_loader = DataLoader(
         train_set,
         batch_size=96,
@@ -110,41 +151,13 @@ if __name__ == "__main__":
         pin_memory=True
     )
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
+    print("Mode: {}".format(device))
     #model = KSSNet().to(device)
     model = resnet101(pretrained=True, num_classes=80).to(device)
-    #model.load_state_dict(torch.load('tmp.pth').state_dict())
-    model = nn.DataParallel(model)
-    #mAP = test(model, test_loader)
-    #print('mAP: {:.2f}'.format(mAP))
-
-    criterion = nn.BCELoss().to(device)
-    #criterion = nn.MultiLabelSoftMarginLoss()
-    #optimizer = torch.optim.SGD(model.parameters(),
-    #                            lr=0.1,
-    #                            momentum=0.9,
-    #                            weight_decay=1e-4)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=[20, 40], gamma=0.1)
-    for epoch in range(200):
-        scheduler.step()
-        for idx, ((imgs, img_names, word_embedding), targets) in tqdm(enumerate(train_loader)):
-            imgs, targets = imgs.to(device), targets.to(device)
-            #import pdb
-            #pdb.set_trace()
-            #predicts = model(imgs, word_embedding)
-            predicts = model(imgs)
-            #print(predicts)
-            loss = criterion(predicts, targets)
-            #print('Epoch: {} | loss: {:.2f} |'.format(epoch+1, loss.item()))
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-
-        if isinstance(model, nn.DataParallel):
-            torch.save(model.module, os.path.join(ckpt_dir, 'checkpoints.pth'))
-        else:
-            torch.save(model, 'tmp.pth')
-        if epoch % 1 == 0:
-            mAP = test(model, test_loader)
-            print("Epoch: {} | mAP: {}".format(epoch, mAP))
+    if args.test:
+        model.load_state_dict(torch.load(args.ckpt).state_dict())
+        model = nn.DataParallel(model)
+        test(model, test_loader)
+    else:
+        model = nn.DataParallel(model)
+        train(args, model, train_loader, test_loader)
