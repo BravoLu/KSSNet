@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Multi-Label-Classification-Baseline
 
 * This repo provides a baseline for multi-label classification task based on resnet101 and KSSNet for coco2014.  
@@ -44,8 +43,3 @@
 | ------ | ----- |
 | ResNet | 76\.1 |
 | KSSNet | 77\.0 |
-=======
-# KSSNet
-
-
->>>>>>> f31aca85d6b76cfb4ae489250c238bbb2a29460a
